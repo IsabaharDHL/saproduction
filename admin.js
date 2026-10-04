@@ -96,3 +96,49 @@ $("logoutButton").addEventListener("click",()=>signOut(auth));
 $("changePassword").addEventListener("click",async()=>{const status=$("passwordStatus"),current=$("currentPassword").value,next=$("newPassword").value,confirmation=$("confirmPassword").value;status.className="";if(next.length<8){status.textContent="كلمة المرور الجديدة لازم تكون 8 أحرف على الأقل.";status.className="error";return;}if(next!==confirmation){status.textContent="تأكيد كلمة المرور غير مطابق.";status.className="error";return;}try{await reauthenticateWithCredential(auth.currentUser,EmailAuthProvider.credential(ADMIN_EMAIL,current));await updatePassword(auth.currentUser,next);["currentPassword","newPassword","confirmPassword"].forEach(id=>$(id).value="");status.textContent="تم تغيير كلمة المرور مباشرة.";status.className="status";}catch{status.textContent="تعذر التغيير. تأكد من كلمة المرور الحالية.";status.className="error";}});
 
 if(!firebaseReady()){$("loginButton").disabled=true;$("loginPassword").disabled=true;$("loginStatus").textContent="Firebase غير مربوط بعد. أكمل إعداد firebase-config.js أولًا.";}else{const app=initializeApp(firebaseConfig);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,async user=>{$("loginView").classList.toggle("hidden",!!user);$("adminView").classList.toggle("hidden",!user);if(!user)return;try{const snap=await getDoc(doc(db,"sites","main"));draft=mergeData(snap.exists()?snap.data():{});renderAll();if(localStorage.getItem("saData"))$("importOld").classList.remove("hidden");showStatus(snap.exists()?"البيانات محمّلة من الموقع.":"اضغط حفظ لنشر البيانات الأساسية لأول مرة.");}catch(error){console.error(error);showStatus("دخلت بنجاح، لكن تعذر تحميل البيانات. تحقق من قواعد Firestore.",true);}});}
+
+
+// Content controls use the same draft and publish action as existing fields.
+const contentFields = [];
+function contentPair(key,label) {
+  return ['Ar','En'].map(suffix => {
+    const id = key+suffix;
+    contentFields.push(id);
+    return '<div class="f"><label for="'+id+'">'+safe(label)+(suffix === 'Ar' ? ' بالعربي' : ' — English')+'</label><textarea id="'+id+'"'+(suffix === 'En' ? ' dir="ltr"' : '')+'></textarea></div>';
+  }).join('');
+}
+$('site').querySelector('.grid').insertAdjacentHTML('beforeend',contentPair('heroDescription','النص تحت عنوان البانر'));
+const serviceTab = document.createElement('button');
+serviceTab.dataset.id = 'servicesEditor';
+serviceTab.textContent = 'خدماتنا';
+document.querySelector('.tabs').append(serviceTab);
+const serviceSection = document.createElement('section');
+serviceSection.className = 'sec';
+serviceSection.id = 'servicesEditor';
+let serviceMarkup = '<div class="panel"><h2>خدماتنا</h2><div class="grid">'+contentPair('services','عنوان قسم خدماتنا');
+for (const [key,label] of [['artists','الفنانين'],['events','الفعاليات'],['studio','الاستوديو']]) {
+  serviceMarkup += contentPair(key,'اسم خدمة '+label)+contentPair(key+'Description','وصف خدمة '+label);
+}
+serviceMarkup += '</div>';
+for (const [group,label] of [['eventItems','تفاصيل خدمات الفعاليات'],['studioItems','تفاصيل خدمات الاستوديو']]) {
+  serviceMarkup += '<h3>'+label+'</h3><div class="grid">';
+  for (let i=0;i<3;i++) serviceMarkup += contentPair(group+i+'Title','عنوان الخدمة '+(i+1))+contentPair(group+i+'Description','تفاصيل الخدمة '+(i+1));
+  serviceMarkup += '</div>';
+}
+serviceSection.innerHTML = serviceMarkup+'</div>';
+$('adminView').insertBefore(serviceSection,document.querySelector('.savebar'));
+serviceTab.addEventListener('click',() => {
+  document.querySelectorAll('.tabs button,.sec').forEach(e=>e.classList.remove('on'));
+  serviceTab.classList.add('on'); serviceSection.classList.add('on');
+});
+for (const id of contentFields) $(id).addEventListener('input',markChanged);
+const fillExistingFields = fillMainFields;
+fillMainFields = function() {
+  fillExistingFields();
+  for (const id of contentFields) $(id).value = draft[id] ?? SA_I18N.defaults[id] ?? '';
+};
+const readExistingFields = readMainFields;
+readMainFields = function() {
+  readExistingFields();
+  for (const id of contentFields) draft[id] = $(id).value.trim();
+};
