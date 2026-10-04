@@ -61,3 +61,26 @@ window.SA_I18N = (() => {
   }
   return {defaults, dictionary};
 })();
+
+
+// Editable banner subtitle and services; old published content keeps its defaults.
+(() => {
+  const api = window.SA_I18N;
+  const original = api.dictionary;
+  const keys = ['heroDescription','services','artists','events','studio','artistsDescription','eventsDescription','studioDescription'];
+  for (const [lang,suffix] of [['ar','Ar'],['en','En']]) {
+    const base = original(lang,api.defaults);
+    for (const key of keys) api.defaults[key+suffix] = base[key];
+    for (const group of ['eventItems','studioItems']) base[group].forEach((item,i) => {
+      api.defaults[group+i+'Title'+suffix] = item.title;
+      api.defaults[group+i+'Description'+suffix] = item.description;
+    });
+  }
+  api.dictionary = (lang,data) => {
+    const result = original(lang,data), suffix = lang === 'ar' ? 'Ar' : 'En';
+    const value = (key,fallback) => typeof data[key+suffix] === 'string' && data[key+suffix].trim() && (lang !== 'en' || !/[\u0600-\u06ff]/.test(data[key+suffix])) ? data[key+suffix] : fallback;
+    for (const key of keys) result[key] = value(key,result[key]);
+    for (const group of ['eventItems','studioItems']) result[group] = result[group].map((item,i) => ({title:value(group+i+'Title',item.title),description:value(group+i+'Description',item.description)}));
+    return result;
+  };
+})();
