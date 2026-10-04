@@ -54,7 +54,7 @@
   const visibleArtists = () => Math.min(data.artists.length, window.innerWidth <= 480 ? 1 : window.innerWidth <= 800 ? 2 : 4);
   function carousel(extra = 0) {
     const count = visibleArtists();
-    return Array.from({length: Math.min(count + extra, data.artists.length)}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
+    return Array.from({length: data.artists.length ? count + extra : 0}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
   }
   function layoutCarousel() {
     const track = document.getElementById('artistTrack'), count = visibleArtists();
@@ -62,7 +62,7 @@
     track.style.display = 'flex';
     track.style.gap = '15px';
     for (const card of track.children) card.style.flex = '0 0 calc((100% - ' + Math.max(0, count - 1) * 15 + 'px) / ' + Math.max(1, count) + ')';
-    for (const id of ['prev', 'next']) document.getElementById(id).disabled = data.artists.length <= count;
+    for (const id of ['prev', 'next']) document.getElementById(id).disabled = data.artists.length <= 1;
   }
   function stopCarousel() {
     clearTimeout(carouselTimer);
@@ -70,13 +70,13 @@
   }
   function scheduleCarousel() {
     stopCarousel();
-    if (page !== 'index' || document.hidden || modal || carouselHovered || carouselFocused || carouselTouching || data.artists.length <= visibleArtists()) return;
+    if (page !== 'index' || document.hidden || modal || carouselHovered || carouselFocused || carouselTouching || data.artists.length <= 1) return;
     carouselTimer = setTimeout(() => moveCarousel(1), 3200);
   }
   function moveCarousel(direction) {
     const track = document.getElementById('artistTrack'), count = visibleArtists();
     stopCarousel();
-    if (!track || carouselAnimation || data.artists.length <= count) return;
+    if (!track || carouselAnimation || data.artists.length <= 1) return;
     const nextStart = (start + direction + data.artists.length) % data.artists.length;
     if (direction < 0) start = nextStart;
     track.innerHTML = carousel(1);
