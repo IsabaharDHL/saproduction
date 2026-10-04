@@ -259,7 +259,18 @@
   });
   document.addEventListener('keydown', event => {if(event.key==='Escape' && modal){modal=null;renderModal();}});
   // Firebase sends published content to every device through this event.
+  const loadingStarted=performance.now();
+  let pendingContent, contentTimer;
   window.addEventListener('sa:content', event => {
+    const remaining=2000-(performance.now()-loadingStarted);
+    if(!contentReady && remaining>0) {
+      pendingContent=event.detail;
+      if(!contentTimer) contentTimer=setTimeout(()=>{
+        contentTimer=null;
+        window.dispatchEvent(new CustomEvent('sa:content',{detail:pendingContent}));
+      },Math.ceil(remaining));
+      return;
+    }
     const firstContent=!contentReady;
     contentReady = true;
     data = normalized(event.detail);
