@@ -142,3 +142,30 @@ readMainFields = function() {
   readExistingFields();
   for (const id of contentFields) draft[id] = $(id).value.trim();
 };
+
+
+// Keep the public preview cache aligned with a successful publish.
+const publishStatus = showStatus;
+showStatus = function(message,isError=false) {
+  publishStatus(message,isError);
+  if (!isError && message.startsWith('تم الحفظ والنشر.')) {
+    const savedAt=Date.now();
+    try {localStorage.setItem('sa-last-publish',String(savedAt));} catch {}
+    const data=clone(draft);
+    Promise.all([
+      resolveImage(data.bannerImage).then(value=>{data.bannerImage=value;}),
+      ...(data.artists||[]).map(async item=>{item.image=await resolveImage(item.image);}),
+      ...(data.offers||[]).map(async item=>{item.image=await resolveImage(item.image);})
+    ]).then(()=>new Promise((resolve,reject)=>{
+      const request=indexedDB.open('sa-published-content-v1',1);
+      request.onupgradeneeded=()=>request.result.createObjectStore('content');
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const database=request.result,tx=database.transaction('content','readwrite');
+        tx.objectStore('content').put({data,savedAt},'main');
+        tx.oncomplete=()=>{database.close();resolve();};
+        tx.onerror=()=>{database.close();reject(tx.error);};
+      };
+    })).catch(()=>{});
+  }
+};
