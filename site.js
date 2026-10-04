@@ -51,46 +51,84 @@
   const artistCard = i => `<a class="card artist" href="artist.html?i=${i+1}" data-open="artist" data-index="${i}"><div class="photo" style="${background(data.artists[i].image,'management.jpg')};background-position:${artistPosition(data.artists[i])}"></div><b>${esc(words.artistContent[i].name)}</b></a>`;
   let carouselTimer = null, carouselAnimation = null;
   let carouselHovered = false, carouselFocused = false, carouselTouching = false;
+  let carouselOffset = 0, carouselLastTime = null;
   const visibleArtists = () => Math.min(data.artists.length, window.innerWidth <= 480 ? 1 : window.innerWidth <= 800 ? 2 : 4);
-  function carousel(extra = 0) {
+  function carousel() {
     const count = visibleArtists();
-    return Array.from({length: data.artists.length ? count + extra : 0}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
+    return Array.from({length: data.artists.length ? count + (data.artists.length > 1 ? 1 : 0) : 0}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
+  }
+  function carouselStep() {
+    const track = document.getElementById('artistTrack');
+    return track?.children[0] ? track.children[0].getBoundingClientRect().width + 15 : 1;
+  }
+  function positionCarousel() {
+    const track = document.getElementById('artistTrack');
+    if (track) track.style.transform = 'translateX(' + (lang === 'ar' ? 1 : -1) * carouselOffset * carouselStep() + 'px)';
   }
   function layoutCarousel() {
     const track = document.getElementById('artistTrack'), count = visibleArtists();
     if (!track) return;
     track.style.display = 'flex';
     track.style.gap = '15px';
-    for (const card of track.children) card.style.flex = '0 0 calc((100% - ' + Math.max(0, count - 1) * 15 + 'px) / ' + Math.max(1, count) + ')';
+    track.style.willChange = 'transform';
+    for (const card of track.children) {
+      card.style.flex = '0 0 calc((100% - ' + Math.max(0, count - 1) * 15 + 'px) / ' + Math.max(1, count) + ')';
+      card.style.minWidth = '0';
+    }
     for (const id of ['prev', 'next']) document.getElementById(id).disabled = data.artists.length <= 1;
+    positionCarousel();
   }
   function stopCarousel() {
-    clearTimeout(carouselTimer);
+    if (carouselTimer !== null) cancelAnimationFrame(carouselTimer);
     carouselTimer = null;
+    carouselLastTime = null;
+  }
+  function carouselPaused() {
+    return page !== 'index' || document.hidden || modal || carouselHovered || carouselFocused || carouselTouching || carouselAnimation || data.artists.length <= 1;
+  }
+  function tickCarousel(time) {
+    carouselTimer = null;
+    if (carouselPaused()) {carouselLastTime = null; return;}
+    const elapsed = carouselLastTime === null ? 0 : Math.min(time - carouselLastTime, 64);
+    carouselLastTime = time;
+    carouselOffset += elapsed * 0.028 / carouselStep();
+    if (carouselOffset >= 1) {
+      start = (start + Math.floor(carouselOffset)) % data.artists.length;
+      carouselOffset %= 1;
+      document.getElementById('artistTrack').innerHTML = carousel();
+      layoutCarousel();
+    } else positionCarousel();
+    carouselTimer = requestAnimationFrame(tickCarousel);
   }
   function scheduleCarousel() {
     stopCarousel();
-    if (page !== 'index' || document.hidden || modal || carouselHovered || carouselFocused || carouselTouching || data.artists.length <= 1) return;
-    carouselTimer = setTimeout(() => moveCarousel(1), 3200);
+    if (!carouselPaused()) carouselTimer = requestAnimationFrame(tickCarousel);
   }
   function moveCarousel(direction) {
-    const track = document.getElementById('artistTrack'), count = visibleArtists();
+    const track = document.getElementById('artistTrack');
     stopCarousel();
     if (!track || carouselAnimation || data.artists.length <= 1) return;
+    const shift = (lang === 'ar' ? 1 : -1) * carouselStep();
     const nextStart = (start + direction + data.artists.length) % data.artists.length;
-    if (direction < 0) start = nextStart;
-    track.innerHTML = carousel(1);
-    layoutCarousel();
-    const distance = track.children[0].getBoundingClientRect().width + 15;
-    const shift = (lang === 'ar' ? 1 : -1) * distance;
+    let from = carouselOffset * shift, to = shift;
+    if (direction < 0) {
+      // Keep the visible cards in place while adding the preceding card.
+      start = nextStart;
+      track.innerHTML = carousel();
+      track.insertAdjacentHTML('beforeend', artistCard((start + visibleArtists() + 1) % data.artists.length));
+      layoutCarousel();
+      from = (1 + carouselOffset) * shift;
+      to = 0;
+    }
     const animation = track.animate(
-      [{transform: 'translateX(' + (direction < 0 ? shift : 0) + 'px)'}, {transform: 'translateX(' + (direction < 0 ? 0 : shift) + 'px)'}],
-      {duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450, easing: 'ease-in-out', fill: 'forwards'}
+      [{transform: 'translateX(' + from + 'px)'}, {transform: 'translateX(' + to + 'px)'}],
+      {duration: 400, easing: 'ease-in-out', fill: 'forwards'}
     );
     carouselAnimation = animation;
     animation.finished.then(() => {
       if (carouselAnimation !== animation) return;
       start = nextStart;
+      carouselOffset = 0;
       track.innerHTML = carousel();
       layoutCarousel();
       animation.cancel();
@@ -108,9 +146,7 @@
     root.addEventListener('mouseenter', () => {if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {carouselHovered = true; stopCarousel();}});
     root.addEventListener('mouseleave', () => {carouselHovered = false; scheduleCarousel();});
     root.addEventListener('focusin', () => {carouselFocused = true; stopCarousel();});
-    root.addEventListener('focusout', event => {
-      if (!root.contains(event.relatedTarget)) {carouselFocused = false; scheduleCarousel();}
-    });
+    root.addEventListener('focusout', event => {if (!root.contains(event.relatedTarget)) {carouselFocused = false; scheduleCarousel();}});
     root.addEventListener('pointerdown', event => {if (event.pointerType !== 'mouse') {carouselTouching = true; stopCarousel();}});
     scheduleCarousel();
   }
@@ -118,7 +154,7 @@
   document.addEventListener('pointercancel', () => {carouselTouching = false; scheduleCarousel();});
   document.addEventListener('visibilitychange', scheduleCarousel);
   window.addEventListener('resize', () => {
-    if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null;}
+    if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null; carouselOffset = 0;}
     const track = document.getElementById('artistTrack');
     if (track) {track.innerHTML = carousel(); layoutCarousel();}
     scheduleCarousel();
