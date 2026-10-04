@@ -10,7 +10,7 @@ export const firebaseConfig = {
 };
 
 // بريد مالك لوحة التحكم. لا يظهر في شاشة الدخول.
-export const ADMIN_EMAIL = "admin@sa-production.app";
+export const ADMIN_EMAIL = "essa.bahar@gmail.com";
 
 export const firebaseReady = () =>
   firebaseConfig.apiKey !== "REPLACE_ME" &&
