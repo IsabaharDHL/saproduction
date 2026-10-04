@@ -27,7 +27,7 @@ if (firebaseReady()) {
   }
   cacheAccess('readonly').then(cached => {
     let savedAt=0;try {savedAt=Number(localStorage.getItem('sa-last-publish'))||0;}catch{}
-    if(!published&&cached&&cached.savedAt>=savedAt) publish(cached.data);
+    if(!published&&cached&&cached.savedAt>=savedAt) {published=true;publish(cached.data);}
   }).catch(()=>{});
   async function resolveImage(value) {
     if (typeof value !== "string" || !value.startsWith("firestore-image:")) return value;
@@ -48,7 +48,16 @@ if (firebaseReady()) {
   onSnapshot(doc(db,"sites","main"),async snapshot => {
     const current = ++revision;
     if (!snapshot.exists()) {failed(new Error("Published content is missing"));return;}
-    try {const data=await resolvedContent(snapshot.data());if(current===revision) {published=true;publish(data);cacheAccess('readwrite',{data,savedAt:Date.now()}).catch(()=>{});}}
+    const source=snapshot.data();
+    if (!published) {
+      const preview=structuredClone(source);
+      const blank='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      const placeholder=value=>typeof value==='string'&&value.startsWith('firestore-image:')?blank:value;
+      preview.bannerImage=placeholder(preview.bannerImage);
+      for(const item of [...(preview.artists||[]),...(preview.offers||[])]) item.image=placeholder(item.image);
+      published=true;publish(preview);
+    }
+    try {const data=await resolvedContent(source);if(current===revision) {published=true;publish(data);cacheAccess('readwrite',{data,savedAt:Date.now()}).catch(()=>{});}}
     catch(error) {if(current===revision) failed(error);}
   },failed);
 } else {failed(new Error("Firebase configuration is missing"));}
