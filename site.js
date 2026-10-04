@@ -49,16 +49,87 @@
   }
   const footer = () => `<footer><img src="logo-white.png" alt="${text('brand')}"><p>${text('copyright')}</p><small>${text('credit')}</small></footer>`;
   const artistCard = i => `<a class="card artist" href="artist.html?i=${i+1}" data-open="artist" data-index="${i}"><div class="photo" style="${background(data.artists[i].image,'management.jpg')};background-position:${artistPosition(data.artists[i])}"></div><b>${esc(words.artistContent[i].name)}</b></a>`;
-  function carousel() {
-    return Array.from({length:Math.min(4,data.artists.length)},(_,k)=>artistCard((start+k)%data.artists.length)).join('');
+  let carouselTimer = null, carouselAnimation = null;
+  let carouselHovered = false, carouselFocused = false, carouselTouching = false;
+  const visibleArtists = () => Math.min(data.artists.length, window.innerWidth <= 480 ? 1 : window.innerWidth <= 800 ? 2 : 4);
+  function carousel(extra = 0) {
+    const count = visibleArtists();
+    return Array.from({length: Math.min(count + extra, data.artists.length)}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
   }
+  function layoutCarousel() {
+    const track = document.getElementById('artistTrack'), count = visibleArtists();
+    if (!track) return;
+    track.style.display = 'flex';
+    track.style.gap = '15px';
+    for (const card of track.children) card.style.flex = '0 0 calc((100% - ' + Math.max(0, count - 1) * 15 + 'px) / ' + Math.max(1, count) + ')';
+    for (const id of ['prev', 'next']) document.getElementById(id).disabled = data.artists.length <= count;
+  }
+  function stopCarousel() {
+    clearTimeout(carouselTimer);
+    carouselTimer = null;
+  }
+  function scheduleCarousel() {
+    stopCarousel();
+    if (page !== 'index' || document.hidden || modal || carouselHovered || carouselFocused || carouselTouching || data.artists.length <= visibleArtists()) return;
+    carouselTimer = setTimeout(() => moveCarousel(1), 3200);
+  }
+  function moveCarousel(direction) {
+    const track = document.getElementById('artistTrack'), count = visibleArtists();
+    stopCarousel();
+    if (!track || carouselAnimation || data.artists.length <= count) return;
+    const nextStart = (start + direction + data.artists.length) % data.artists.length;
+    if (direction < 0) start = nextStart;
+    track.innerHTML = carousel(1);
+    layoutCarousel();
+    const distance = track.children[0].getBoundingClientRect().width + 15;
+    const shift = (lang === 'ar' ? 1 : -1) * distance;
+    const animation = track.animate(
+      [{transform: 'translateX(' + (direction < 0 ? shift : 0) + 'px)'}, {transform: 'translateX(' + (direction < 0 ? 0 : shift) + 'px)'}],
+      {duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450, easing: 'ease-in-out', fill: 'forwards'}
+    );
+    carouselAnimation = animation;
+    animation.finished.then(() => {
+      if (carouselAnimation !== animation) return;
+      start = nextStart;
+      track.innerHTML = carousel();
+      layoutCarousel();
+      animation.cancel();
+      carouselAnimation = null;
+      scheduleCarousel();
+    }).catch(() => {});
+  }
+  function initCarousel() {
+    const root = document.querySelector('.artistCarousel');
+    if (!root) return;
+    carouselHovered = root.matches(':hover');
+    carouselFocused = root.contains(document.activeElement);
+    carouselTouching = false;
+    layoutCarousel();
+    root.addEventListener('mouseenter', () => {carouselHovered = true; stopCarousel();});
+    root.addEventListener('mouseleave', () => {carouselHovered = false; scheduleCarousel();});
+    root.addEventListener('focusin', () => {carouselFocused = true; stopCarousel();});
+    root.addEventListener('focusout', event => {
+      if (!root.contains(event.relatedTarget)) {carouselFocused = false; scheduleCarousel();}
+    });
+    root.addEventListener('pointerdown', event => {if (event.pointerType !== 'mouse') {carouselTouching = true; stopCarousel();}});
+    scheduleCarousel();
+  }
+  document.addEventListener('pointerup', () => {carouselTouching = false; scheduleCarousel();});
+  document.addEventListener('pointercancel', () => {carouselTouching = false; scheduleCarousel();});
+  document.addEventListener('visibilitychange', scheduleCarousel);
+  window.addEventListener('resize', () => {
+    if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null;}
+    const track = document.getElementById('artistTrack');
+    if (track) {track.innerHTML = carousel(); layoutCarousel();}
+    scheduleCarousel();
+  });
   function offerCards() {
     return data.offers.map((o,i)=>`<a class="card feature" href="offer.html?id=${i+1}" data-open="offer" data-index="${i}"><h3>${esc(words.offerContent[i].name)}</h3><p>${text('details')}</p></a>`).join('');
   }
   function home() {
     return `<header class="hero" style="${background(data.bannerImage,'hero.jpg')}"><div class="hc"><img src="logo-white.png" alt="${text('brand')}"><h1>${text('heroTitle')}</h1><p>${text('heroDescription')}</p><a class="wa" href="#booking">${text('bookNow')}</a></div></header>
     <section><div class="w"><h2 class="title">${text('services')}</h2><div class="g3">${['artists','events','studio'].map(k=>`<div class="card"><div class="photo" style="background-image:url(${k==='artists'?'management':k}.jpg)"></div><div class="body"><h2>${text(k)}</h2><p>${text(k+'Description')}</p><a class="more" href="${k}.html" data-open="${k}">${text('discover')}</a></div></div>`).join('')}</div></div></section>
-    <section><div class="w"><h2 class="title" id="featuredTitle">${text('featured')}</h2><div class="artistCarousel"><button class="arr ${lang==='ar'?'arrR':'arrL'}" id="prev" dir="ltr" aria-label="${text('previous')}">${lang==='ar'?'›':'‹'}</button><div class="artistTrack" id="artistTrack">${carousel()}</div><button class="arr ${lang==='ar'?'arrL':'arrR'}" id="next" dir="ltr" aria-label="${text('next')}">${lang==='ar'?'‹':'›'}</button></div></div></section>
+    <section><div class="w"><h2 class="title" id="featuredTitle">${text('featured')}</h2><div class="artistCarousel"><button class="arr ${lang==='ar'?'arrR':'arrL'}" id="prev" dir="ltr" aria-label="${text('previous')}">${lang==='ar'?'›':'‹'}</button><div style="overflow:hidden;min-width:0"><div class="artistTrack" id="artistTrack">${carousel()}</div></div><button class="arr ${lang==='ar'?'arrL':'arrR'}" id="next" dir="ltr" aria-label="${text('next')}">${lang==='ar'?'‹':'›'}</button></div></div></section>
     <section id="booking"><div class="w contact"><div class="panel"><h2>${text('bookingTitle')}</h2><p>${text('bookingDescription')}</p>${wa('whatsapp')}</div><div class="panel qrrow"><div><h2>${text('qrTitle')}</h2><p>${text('qrDescription')}</p></div><img class="qr" src="${esc(whatsappQr())}" alt="${text('qrAlt')}"></div></div></section>
     <section id="offers"><div class="w"><h2 class="title">${text('specialOffers')}</h2><div class="g3">${offerCards()}</div></div></section>`;
   }
@@ -107,14 +178,19 @@
     wrap.classList.toggle('open',!!modal);
     wrap.setAttribute('aria-hidden',String(!modal));
     if (modal) document.getElementById('mc').focus();
+    scheduleCarousel();
   }
   function render() {
+    stopCarousel();
+    if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null;}
+    start = data.artists.length ? start % data.artists.length : 0;
     words=SA_I18N.dictionary(lang,data);
     document.documentElement.lang=lang;
     document.documentElement.dir=lang==='ar'?'rtl':'ltr';
     document.title=page==='index'?t('brand'):`${t(page==='offer'?'specialOffers':page==='artist'?'artists':page)} | ${t('brand')}`;
     document.getElementById('app').innerHTML=nav()+(page==='index'?home():detailPage())+footer()+`<div class="modalWrap" id="mw" aria-hidden="true"><div class="modalBox" role="dialog" aria-modal="true" aria-label="${text('brand')}"><button class="modalClose" id="mc" aria-label="${text('close')}">×</button><div id="mcontent"></div></div></div>`;
     renderModal();
+    initCarousel();
   }
   document.addEventListener('click', event => {
     const target=event.target.closest('a,button,#mw');
@@ -127,7 +203,8 @@
     }
     if (target.id==='mc' || target.id==='mw') {modal=null;renderModal();return;}
     if (target.id==='prev' || target.id==='next') {
-      if (data.artists.length>4) {start=(start+(target.id==='prev'?-1:1)+data.artists.length)%data.artists.length;document.getElementById('artistTrack').innerHTML=carousel();}
+      moveCarousel(target.id === 'prev' ? -1 : 1);
+      if (event.detail > 0) target.blur();
       return;
     }
     if (target.id==='backArtist') {modal=page==='artist'?null:{kind:'artist',index:Number(target.dataset.returnIndex)||0};renderModal();return;}
