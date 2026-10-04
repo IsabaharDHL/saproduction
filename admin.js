@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { firebaseConfig, ADMIN_EMAIL, firebaseReady } from "./firebase-config.js";
 
 const $ = id => document.getElementById(id);
@@ -33,7 +33,7 @@ async function compressImage(file) {
   }
   throw new Error("الصورة كبيرة جدًا حتى بعد الضغط.");
 }
-async function storeImage(file){const id=crypto.randomUUID(),dataUrl=await compressImage(file);await setDoc(doc(db,"siteImages",id),{dataUrl,updatedAt:serverTimestamp()});return `firestore-image:${id}`;}
+async function storeImage(file){const dataUrl=await compressImage(file),imageRef=doc(collection(db,"siteImages"));await setDoc(imageRef,{dataUrl,updatedAt:serverTimestamp()});return `firestore-image:${imageRef.id}`;}
 async function resolveImage(value){if(typeof value!=="string"||!value.startsWith("firestore-image:"))return value;const snap=await getDoc(doc(db,"siteImages",value.slice(16)));return snap.exists()?snap.data().dataUrl:"";}
 function previewMarkup(value,alt,options={}){const classes=`preview${options.focus?" focusPreview":""}${options.detail?" detailPreview":""}`,position=options.position?` style="object-position:${safe(options.position)}"`:"",focusAttr=options.detail?` data-detail-focus-artist="${options.index}"`:(options.focus?` data-focus-artist="${options.index}"`:"");if(!value)return `<img class="${classes} hidden"${focusAttr}${position} alt="${alt}">`;return value.startsWith("firestore-image:")?`<img class="${classes}" data-image-ref="${safe(value)}"${focusAttr}${position} alt="${alt}">`:`<img class="${classes}" src="${safe(value)}"${focusAttr}${position} alt="${alt}">`;}
 async function resolvePreviews(root=document){await Promise.all([...root.querySelectorAll("[data-image-ref]")].map(async image=>{image.src=await resolveImage(image.dataset.imageRef);}));}
