@@ -217,6 +217,14 @@
     scheduleCarousel();
   }
   function render() {
+    if (!contentReady) {
+      words=SA_I18N.dictionary(lang,data);
+      document.documentElement.lang=lang;
+      document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+      const message=contentError ? (lang==='ar'?'تعذر تحميل الموقع. أعد تحميل الصفحة للمحاولة.':'Unable to load the site. Reload to try again.') : (lang==='ar'?'جاري تحميل الموقع…':'Loading…');
+      document.getElementById('app').innerHTML=nav()+'<main class="w" style="min-height:55vh;display:grid;place-items:center"><p role="status" aria-live="polite">'+esc(message)+'</p></main>'+footer();
+      return;
+    }
     stopCarousel();
     if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null;}
     start = data.artists.length ? start % data.artists.length : 0;
@@ -252,10 +260,13 @@
   document.addEventListener('keydown', event => {if(event.key==='Escape' && modal){modal=null;renderModal();}});
   // Firebase sends published content to every device through this event.
   window.addEventListener('sa:content', event => {
+    contentReady = true;
     data = normalized(event.detail);
     const scroll = window.scrollY;
     render();
     window.scrollTo(0, scroll);
   });
+  let contentReady = false, contentError = false;
+  window.addEventListener('sa:content-error', () => {if(!contentReady){contentError=true;render();}});
   render();
 })();
