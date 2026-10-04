@@ -265,7 +265,7 @@
     data = normalized(event.detail);
     const scroll = window.scrollY;
     render();
-    if(firstContent&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('app').animate([{opacity:.35},{opacity:1}],{duration:400,easing:'ease-out'});
+    if(firstContent&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('app').animate([{opacity:.35},{opacity:1}],{duration:180,easing:'ease-out'});
     window.scrollTo(0, scroll);
   });
   let contentReady = false, contentError = false;
@@ -277,12 +277,12 @@ const loadingStyle=document.createElement('style');
     .sa-loading{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 24px;background:radial-gradient(ellipse at center,#ffffff08,transparent 60%)}
     .sa-loading-brand{position:relative;width:150px;height:150px;overflow:hidden;animation:sa-breathe 2.4s ease-in-out infinite}
     .sa-loading-brand img{width:100%;height:100%;object-fit:contain;display:block}
-    .sa-loading-shine{position:absolute;inset:-30%;background:linear-gradient(110deg,transparent 40%,#ffffff35 50%,transparent 60%);transform:translateX(-130%);animation:sa-shine 2.8s ease-in-out infinite;pointer-events:none}
+    .sa-loading-shine{position:absolute;inset:0;background:linear-gradient(110deg,transparent 42%,#fff9 50%,transparent 58%) 150% 0/300% 100% no-repeat;-webkit-mask:url("logo-white.png") center/contain no-repeat;mask:url("logo-white.png") center/contain no-repeat;animation:sa-shine 2.4s ease-in-out infinite;pointer-events:none}
     .sa-loading-line{width:110px;height:2px;background:#ffffff15;border-radius:2px;overflow:hidden}
     .sa-loading-line span{display:block;width:45%;height:100%;background:#fff;border-radius:2px;animation:sa-progress 1.5s ease-in-out infinite}
     .sa-loading p{margin:0;color:#aaa;font-size:13px;line-height:1.8;text-align:center}
     @keyframes sa-breathe{0%,100%{opacity:.5;transform:scale(.96)}50%{opacity:1;transform:scale(1)}}
-    @keyframes sa-shine{0%,20%{transform:translateX(-130%)}75%,100%{transform:translateX(130%)}}
+    @keyframes sa-shine{0%,15%{background-position:150% 0}80%,100%{background-position:-50% 0}}
     @keyframes sa-progress{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
     .sa-loading-error .sa-loading-brand,.sa-loading-error .sa-loading-shine{animation:none;opacity:1;transform:none}
     .sa-loading-error .sa-loading-shine,.sa-loading-error .sa-loading-line{display:none}
