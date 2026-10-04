@@ -8,7 +8,27 @@ if (firebaseReady()) {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const images = new Map();
-  let revision = 0;
+  let revision = 0, published = false;
+  const cacheDb = new Promise((resolve,reject) => {
+    const request=indexedDB.open('sa-published-content-v1',1);
+    request.onupgradeneeded=()=>request.result.createObjectStore('content');
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error);
+  });
+  async function cacheAccess(mode,value) {
+    const database=await cacheDb;
+    return new Promise((resolve,reject) => {
+      const tx=database.transaction('content',mode),store=tx.objectStore('content');
+      const request=mode==='readonly'?store.get('main'):store.put(value,'main');
+      tx.oncomplete=()=>resolve(request.result);
+      tx.onerror=()=>reject(tx.error);
+      tx.onabort=()=>reject(tx.error);
+    });
+  }
+  cacheAccess('readonly').then(cached => {
+    let savedAt=0;try {savedAt=Number(localStorage.getItem('sa-last-publish'))||0;}catch{}
+    if(!published&&cached&&cached.savedAt>=savedAt) publish(cached.data);
+  }).catch(()=>{});
   async function resolveImage(value) {
     if (typeof value !== "string" || !value.startsWith("firestore-image:")) return value;
     if (!images.has(value)) {
@@ -27,8 +47,8 @@ if (firebaseReady()) {
   }
   onSnapshot(doc(db,"sites","main"),async snapshot => {
     const current = ++revision;
-    if (!snapshot.exists()) {publish({});return;}
-    try {const data=await resolvedContent(snapshot.data());if(current===revision) publish(data);}
+    if (!snapshot.exists()) {failed(new Error("Published content is missing"));return;}
+    try {const data=await resolvedContent(snapshot.data());if(current===revision) {published=true;publish(data);cacheAccess('readwrite',{data,savedAt:Date.now()}).catch(()=>{});}}
     catch(error) {if(current===revision) failed(error);}
   },failed);
 } else {failed(new Error("Firebase configuration is missing"));}
