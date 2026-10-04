@@ -101,11 +101,11 @@
   function initCarousel() {
     const root = document.querySelector('.artistCarousel');
     if (!root) return;
-    carouselHovered = root.matches(':hover');
+    carouselHovered = window.matchMedia('(hover: hover) and (pointer: fine)').matches && root.matches(':hover');
     carouselFocused = root.contains(document.activeElement);
     carouselTouching = false;
     layoutCarousel();
-    root.addEventListener('mouseenter', () => {carouselHovered = true; stopCarousel();});
+    root.addEventListener('mouseenter', () => {if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {carouselHovered = true; stopCarousel();}});
     root.addEventListener('mouseleave', () => {carouselHovered = false; scheduleCarousel();});
     root.addEventListener('focusin', () => {carouselFocused = true; stopCarousel();});
     root.addEventListener('focusout', event => {
