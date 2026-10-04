@@ -222,7 +222,7 @@
       document.documentElement.lang=lang;
       document.documentElement.dir=lang==='ar'?'rtl':'ltr';
       const message=contentError ? (lang==='ar'?'تعذر تحميل الموقع. أعد تحميل الصفحة للمحاولة.':'Unable to load the site. Reload to try again.') : (lang==='ar'?'جاري تحميل الموقع…':'Loading…');
-      document.getElementById('app').innerHTML=nav()+'<main class="w" style="min-height:55vh;display:grid;place-items:center"><p role="status" aria-live="polite">'+esc(message)+'</p></main>'+footer();
+      document.getElementById('app').innerHTML=nav()+'<main class="sa-loading'+(contentError?' sa-loading-error':'')+'"><div class="sa-loading-brand"><img src="logo-white.png" alt="S.A Production" width="150" height="150"><span class="sa-loading-shine" aria-hidden="true"></span></div><div class="sa-loading-line" aria-hidden="true"><span></span></div><p role="status" aria-live="polite">'+esc(message)+'</p></main>'+footer();
       return;
     }
     stopCarousel();
@@ -260,13 +260,33 @@
   document.addEventListener('keydown', event => {if(event.key==='Escape' && modal){modal=null;renderModal();}});
   // Firebase sends published content to every device through this event.
   window.addEventListener('sa:content', event => {
+    const firstContent=!contentReady;
     contentReady = true;
     data = normalized(event.detail);
     const scroll = window.scrollY;
     render();
+    if(firstContent&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.getElementById('app').animate([{opacity:.35},{opacity:1}],{duration:400,easing:'ease-out'});
     window.scrollTo(0, scroll);
   });
   let contentReady = false, contentError = false;
   window.addEventListener('sa:content-error', () => {if(!contentReady){contentError=true;render();}});
   render();
 })();
+const loadingStyle=document.createElement('style');
+  loadingStyle.textContent=`
+    .sa-loading{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 24px;background:radial-gradient(ellipse at center,#ffffff08,transparent 60%)}
+    .sa-loading-brand{position:relative;width:150px;height:150px;overflow:hidden;animation:sa-breathe 2.4s ease-in-out infinite}
+    .sa-loading-brand img{width:100%;height:100%;object-fit:contain;display:block}
+    .sa-loading-shine{position:absolute;inset:-30%;background:linear-gradient(110deg,transparent 40%,#ffffff35 50%,transparent 60%);transform:translateX(-130%);animation:sa-shine 2.8s ease-in-out infinite;pointer-events:none}
+    .sa-loading-line{width:110px;height:2px;background:#ffffff15;border-radius:2px;overflow:hidden}
+    .sa-loading-line span{display:block;width:45%;height:100%;background:#fff;border-radius:2px;animation:sa-progress 1.5s ease-in-out infinite}
+    .sa-loading p{margin:0;color:#aaa;font-size:13px;line-height:1.8;text-align:center}
+    @keyframes sa-breathe{0%,100%{opacity:.5;transform:scale(.96)}50%{opacity:1;transform:scale(1)}}
+    @keyframes sa-shine{0%,20%{transform:translateX(-130%)}75%,100%{transform:translateX(130%)}}
+    @keyframes sa-progress{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+    .sa-loading-error .sa-loading-brand,.sa-loading-error .sa-loading-shine{animation:none;opacity:1;transform:none}
+    .sa-loading-error .sa-loading-shine,.sa-loading-error .sa-loading-line{display:none}
+    @media(prefers-reduced-motion:reduce){.sa-loading-brand,.sa-loading-shine,.sa-loading-line span{animation:none;transform:none;opacity:1}.sa-loading-shine{display:none}.sa-loading-line span{width:100%}}
+  `;
+  document.head.append(loadingStyle);
+  let contentReady = false, contentError = false;
