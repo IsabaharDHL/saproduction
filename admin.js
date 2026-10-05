@@ -201,3 +201,45 @@ $("alist").addEventListener("input",event=>{
   row.querySelector(".serviceThumbPreview").style.objectPosition=`${x}% ${y}%`;
   markChanged();
 });
+
+// YouTube work galleries for services and social accounts for About.
+for(const [kind,label] of [["events","الفعاليات"],["studio","الاستوديو"]]) {
+  const panel=document.createElement("div");
+  panel.className="panel";
+  panel.innerHTML=`<h2>أعمال ${label} — YouTube</h2><p>أضف روابط أعمالك لعرضها داخل بطاقة ${label}.</p><div id="${kind}VideoList"></div><button class="act" type="button" data-add-service-video="${kind}">+ إضافة فيديو YouTube — ${label}</button>`;
+  serviceSection.append(panel);
+}
+function renderServiceVideoFields() {
+  for(const kind of ["events","studio"]) {
+    const key=kind+"Videos";
+    if(!Array.isArray(draft[key]))draft[key]=[];
+    $(kind+"VideoList").innerHTML=draft[key].map((url,i)=>`<div class="vrow"><input dir="ltr" data-service-video="${kind}" data-video-index="${i}" value="${safe(url)}" placeholder="رابط YouTube" aria-label="رابط فيديو ${kind==='events'?'الفعاليات':'الاستوديو'} ${i+1}"><button class="act danger" type="button" data-delete-service-video="${kind}" data-video-index="${i}">حذف</button></div>`).join("");
+  }
+}
+serviceSection.addEventListener("input",event=>{
+  const kind=event.target.dataset.serviceVideo;
+  if(kind!=="events"&&kind!=="studio")return;
+  draft[kind+"Videos"][Number(event.target.dataset.videoIndex)]=event.target.value.trim();
+  markChanged();
+});
+serviceSection.addEventListener("click",event=>{
+  const button=event.target.closest("button");
+  if(!button)return;
+  const add=button.dataset.addServiceVideo, remove=button.dataset.deleteServiceVideo;
+  if(add==="events"||add==="studio"){(draft[add+"Videos"]||=[]).push("");renderServiceVideoFields();markChanged();$(add+"VideoList").lastElementChild.querySelector("input").focus();}
+  if(remove==="events"||remove==="studio"){draft[remove+"Videos"].splice(Number(button.dataset.videoIndex),1);renderServiceVideoFields();markChanged();}
+});
+const socialAccountFields=[["socialInstagram","إنستقرام","https://www.instagram.com/youraccount/"],["socialYoutube","يوتيوب","https://www.youtube.com/@yourchannel"],["socialSnapchat","سناب شات","https://www.snapchat.com/add/youraccount"],["socialWhatsapp","واتساب","https://wa.me/973XXXXXXXX"]];
+$("about").querySelector(".panel").insertAdjacentHTML("beforeend",'<h2>حسابات التواصل الاجتماعي</h2><p>أضف رابط الحساب كاملًا. اترك الخانة فاضية لإخفاء الأيقونة.</p><div class="grid">'+socialAccountFields.map(([id,label,placeholder])=>`<div class="f"><label for="${id}">${label}</label><input id="${id}" dir="ltr" placeholder="${placeholder}"></div>`).join("")+"</div>");
+for(const [id] of socialAccountFields)$(id).addEventListener("input",markChanged);
+const fillBeforeServiceVideos=fillMainFields;
+fillMainFields=function(){
+  fillBeforeServiceVideos();
+  renderServiceVideoFields();
+  for(const [id] of socialAccountFields)$(id).value=draft[id]||"";
+};
+const readBeforeSocialAccounts=readMainFields;
+readMainFields=function(){
+  readBeforeSocialAccounts();
+  for(const [id] of socialAccountFields)draft[id]=$(id).value.trim();
+};
