@@ -195,14 +195,15 @@
       Instagram:'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="18" cy="6" r="1" fill="currentColor" stroke="none"/>',
       Youtube:'<rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 6 3-6 3Z" fill="currentColor" stroke="none"/>',
       Snapchat:'<path d="M8 10V7a4 4 0 0 1 8 0v3l2-1 1 2-3 1c0 3 2 4 4 5l-3 1-1 2-4-1-4 1-1-2-3-1c2-1 4-2 4-5l-3-1 1-2Z"/>',
+      Tiktok:'<path d="M14 3h3a6 6 0 0 0 4 4v3a9 9 0 0 1-4-2v9a5 5 0 1 1-5-5v3a2 2 0 1 0 2 2Z" fill="currentColor" stroke="none"/>',
       Whatsapp:'<path d="M5 19 3 22l5-1a9 9 0 1 0-3-2Z"/><path d="M8 7c-2 3 3 9 7 9l2-2-3-2-1 1c-2-1-3-2-3-3l1-1-2-3Z"/>'
     };
     const links=Object.entries(icons).map(([key,icon])=>{
       let value=String(data["social"+key]||"").trim();
       if(!value)return "";
       try {const url=new URL(value);if(!["https:","http:"].includes(url.protocol))return "";value=url.href;}catch{return "";}
-      const labels={Instagram:"إنستقرام",Youtube:"يوتيوب",Snapchat:"سناب شات",Whatsapp:"واتساب"};
-      return `<a class="mini" href="${esc(value)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon}</svg>${esc(lang==='ar'?labels[key]:key==='Youtube'?'YouTube':key==='Whatsapp'?'WhatsApp':key)}</a>`;
+      const labels={Instagram:"إنستقرام",Youtube:"يوتيوب",Snapchat:"سناب شات",Tiktok:"تيك توك",Whatsapp:"واتساب"};
+      return `<a class="mini" href="${esc(value)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon}</svg>${esc(lang==='ar'?labels[key]:key==='Youtube'?'YouTube':key==='Tiktok'?'TikTok':key==='Whatsapp'?'WhatsApp':key)}</a>`;
     }).join("");
     return links?`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:24px">${links}</div>`:"";
   }
