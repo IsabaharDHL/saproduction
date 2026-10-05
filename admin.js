@@ -229,7 +229,7 @@ serviceSection.addEventListener("click",event=>{
   if(add==="events"||add==="studio"){(draft[add+"Videos"]||=[]).push("");renderServiceVideoFields();markChanged();$(add+"VideoList").lastElementChild.querySelector("input").focus();}
   if(remove==="events"||remove==="studio"){draft[remove+"Videos"].splice(Number(button.dataset.videoIndex),1);renderServiceVideoFields();markChanged();}
 });
-const socialAccountFields=[["socialInstagram","إنستقرام","https://www.instagram.com/youraccount/"],["socialYoutube","يوتيوب","https://www.youtube.com/@yourchannel"],["socialSnapchat","سناب شات","https://www.snapchat.com/add/youraccount"],["socialWhatsapp","واتساب","https://wa.me/973XXXXXXXX"]];
+const socialAccountFields=[["socialInstagram","إنستقرام","https://www.instagram.com/youraccount/"],["socialYoutube","يوتيوب","https://www.youtube.com/@yourchannel"],["socialSnapchat","سناب شات","https://www.snapchat.com/add/youraccount"],["socialTiktok","تيك توك","https://www.tiktok.com/@youraccount"],["socialWhatsapp","واتساب","https://wa.me/973XXXXXXXX"]];
 $("about").querySelector(".panel").insertAdjacentHTML("beforeend",'<h2>حسابات التواصل الاجتماعي</h2><p>أضف رابط الحساب كاملًا. اترك الخانة فاضية لإخفاء الأيقونة.</p><div class="grid">'+socialAccountFields.map(([id,label,placeholder])=>`<div class="f"><label for="${id}">${label}</label><input id="${id}" dir="ltr" placeholder="${placeholder}"></div>`).join("")+"</div>");
 for(const [id] of socialAccountFields)$(id).addEventListener("input",markChanged);
 const fillBeforeServiceVideos=fillMainFields;
