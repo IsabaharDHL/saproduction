@@ -169,3 +169,35 @@ showStatus = function(message,isError=false) {
     })).catch(()=>{});
   }
 };
+
+// Independent square thumbnail crop for the artists services list.
+const renderArtistsBeforeThumbs = renderArtists;
+const thumbPercent = value => Math.max(0,Math.min(100,Number(value)||0));
+renderArtists = function() {
+  renderArtistsBeforeThumbs();
+  $("alist").querySelectorAll("[data-artist]").forEach(row => {
+    const i=Number(row.dataset.artist), artist=draft.artists[i];
+    const source=row.querySelector(".focusPreview"), box=document.createElement("div");
+    box.className="f";
+    const x=thumbPercent(artist.thumbFocusX??artist.focusX??50), y=thumbPercent(artist.thumbFocusY??artist.focusY??25);
+    box.innerHTML=`<label>ثمنيل الفنان في خدماتنا</label><small>مربع صغير فوق الاسم — حرّك الصورة أفقيًا وعموديًا، ثم احفظ.</small><label>الموضع الأفقي<input type="range" min="0" max="100" value="${x}" data-thumb-axis="X" aria-label="موضع الثمنيل الأفقي"></label><label>الموضع العمودي<input type="range" min="0" max="100" value="${y}" data-thumb-axis="Y" aria-label="موضع الثمنيل العمودي"></label>`;
+    const image=source.cloneNode(true);
+    image.removeAttribute("data-focus-artist");
+    image.removeAttribute("data-detail-focus-artist");
+    image.className=source.className+" serviceThumbPreview";
+    image.alt="معاينة الثمنيل في خدماتنا";
+    image.style.cssText=`display:block;width:96px;height:96px;max-width:100%;object-fit:cover;object-position:${x}% ${y}%;border-radius:8px;margin:12px 0`;
+    box.insertBefore(image,box.querySelectorAll("label")[1]);
+    row.querySelector(".grid").append(box);
+  });
+  resolvePreviews($("alist")).catch(console.error);
+};
+$("alist").addEventListener("input",event=>{
+  const axis=event.target.dataset.thumbAxis;
+  if(axis!=="X"&&axis!=="Y")return;
+  const row=event.target.closest("[data-artist]"), artist=draft.artists[Number(row.dataset.artist)];
+  artist["thumbFocus"+axis]=thumbPercent(event.target.value);
+  const x=thumbPercent(artist.thumbFocusX??artist.focusX??50), y=thumbPercent(artist.thumbFocusY??artist.focusY??25);
+  row.querySelector(".serviceThumbPreview").style.objectPosition=`${x}% ${y}%`;
+  markChanged();
+});
