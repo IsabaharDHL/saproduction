@@ -51,19 +51,21 @@
   const artistCard = i => `<a class="card artist" href="artist.html?i=${i+1}" data-open="artist" data-index="${i}"><div class="photo" style="${background(data.artists[i].image,'management.jpg')};background-position:${artistPosition(data.artists[i])}"></div><b>${esc(words.artistContent[i].name)}</b></a>`;
   let carouselTimer = null, carouselAnimation = null;
   let carouselHovered = false, carouselFocused = false, carouselTouching = false;
-  let carouselOffset = 0, carouselLastTime = null;
+  let carouselOffset = 0, carouselLastTime = null, carouselDrag = null, carouselClickUntil = 0;
   const visibleArtists = () => Math.min(data.artists.length, window.innerWidth <= 480 ? 1 : window.innerWidth <= 800 ? 2 : 4);
   function carousel() {
-    const count = visibleArtists();
-    return Array.from({length: data.artists.length ? count + (data.artists.length > 1 ? 1 : 0) : 0}, (_, k) => artistCard((start + k) % data.artists.length)).join('');
+    const count = visibleArtists(), length = data.artists.length;
+    // Keep a card on both sides so either direction is ready before movement begins.
+    return Array.from({length: length ? count + (length > 1 ? 2 : 0) : 0}, (_, k) => artistCard((start + k - (length > 1 ? 1 : 0) + length) % length)).join('');
   }
   function carouselStep() {
     const track = document.getElementById('artistTrack');
     return track?.children[0] ? track.children[0].getBoundingClientRect().width + 15 : 1;
   }
+  const carouselShift = () => (lang === 'ar' ? 1 : -1) * carouselStep();
   function positionCarousel() {
     const track = document.getElementById('artistTrack');
-    if (track) track.style.transform = 'translateX(' + (lang === 'ar' ? 1 : -1) * carouselOffset * carouselStep() + 'px)';
+    if (track) track.style.transform = 'translateX(' + (carouselOffset + (data.artists.length > 1 ? 1 : 0)) * carouselShift() + 'px)';
   }
   function layoutCarousel() {
     const track = document.getElementById('artistTrack'), count = visibleArtists();
@@ -104,30 +106,18 @@
     stopCarousel();
     if (!carouselPaused()) carouselTimer = requestAnimationFrame(tickCarousel);
   }
-  function moveCarousel(direction) {
+  function settleCarousel(target) {
     const track = document.getElementById('artistTrack');
-    stopCarousel();
-    if (!track || carouselAnimation || data.artists.length <= 1) return;
-    const shift = (lang === 'ar' ? 1 : -1) * carouselStep();
-    const nextStart = (start + direction + data.artists.length) % data.artists.length;
-    let from = carouselOffset * shift, to = shift;
-    if (direction < 0) {
-      // Keep the visible cards in place while adding the preceding card.
-      start = nextStart;
-      track.innerHTML = carousel();
-      track.insertAdjacentHTML('beforeend', artistCard((start + visibleArtists() + 1) % data.artists.length));
-      layoutCarousel();
-      from = (1 + carouselOffset) * shift;
-      to = 0;
-    }
+    if (!track || data.artists.length <= 1) return;
+    const shift = carouselShift(), distance = Math.abs(target - carouselOffset);
     const animation = track.animate(
-      [{transform: 'translateX(' + from + 'px)'}, {transform: 'translateX(' + to + 'px)'}],
-      {duration: 400, easing: 'ease-in-out', fill: 'forwards'}
+      [{transform: 'translateX(' + (1 + carouselOffset) * shift + 'px)'}, {transform: 'translateX(' + (1 + target) * shift + 'px)'}],
+      {duration: Math.max(160, Math.min(420, distance * 420)), easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'forwards'}
     );
     carouselAnimation = animation;
     animation.finished.then(() => {
       if (carouselAnimation !== animation) return;
-      start = nextStart;
+      start = (start + target + data.artists.length) % data.artists.length;
       carouselOffset = 0;
       track.innerHTML = carousel();
       layoutCarousel();
@@ -136,25 +126,78 @@
       scheduleCarousel();
     }).catch(() => {});
   }
+  function moveCarousel(direction) {
+    stopCarousel();
+    if (carouselAnimation || carouselTouching || data.artists.length <= 1) return;
+    settleCarousel(direction);
+  }
   function initCarousel() {
-    const root = document.querySelector('.artistCarousel');
-    if (!root) return;
+    const root = document.querySelector('.artistCarousel'), track = document.getElementById('artistTrack');
+    if (!root || !track) return;
+    const viewport = track.parentElement;
+    viewport.style.touchAction = 'pan-y';
+    viewport.style.userSelect = 'none';
+    viewport.style.webkitUserSelect = 'none';
     carouselHovered = window.matchMedia('(hover: hover) and (pointer: fine)').matches && root.matches(':hover');
     carouselFocused = root.contains(document.activeElement);
     carouselTouching = false;
+    carouselDrag = null;
     layoutCarousel();
     root.addEventListener('mouseenter', () => {if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {carouselHovered = true; stopCarousel();}});
     root.addEventListener('mouseleave', () => {carouselHovered = false; scheduleCarousel();});
     root.addEventListener('focusin', () => {carouselFocused = true; stopCarousel();});
     root.addEventListener('focusout', event => {if (!root.contains(event.relatedTarget)) {carouselFocused = false; scheduleCarousel();}});
-    root.addEventListener('pointerdown', event => {if (event.pointerType !== 'mouse') {carouselTouching = true; stopCarousel();}});
+    viewport.addEventListener('dragstart', event => event.preventDefault());
+    viewport.addEventListener('click', event => {
+      if (performance.now() < carouselClickUntil) {event.preventDefault(); event.stopPropagation();}
+    }, true);
+    viewport.addEventListener('pointerdown', event => {
+      if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0) || carouselAnimation || data.artists.length <= 1) return;
+      carouselTouching = true;
+      stopCarousel();
+      carouselDrag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:carouselOffset, horizontal:false, lastX:event.clientX, lastTime:performance.now(), velocity:0, viewport};
+    });
+    viewport.addEventListener('pointermove', event => {
+      const drag = carouselDrag;
+      if (!drag || drag.id !== event.pointerId) return;
+      const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+      if (!drag.horizontal) {
+        if (Math.max(Math.abs(dx),Math.abs(dy)) < 8) return;
+        if (Math.abs(dy) > Math.abs(dx)) {carouselDrag=null; carouselTouching=false; scheduleCarousel(); return;}
+        drag.horizontal = true;
+        viewport.setPointerCapture(event.pointerId);
+      }
+      event.preventDefault();
+      const now = performance.now();
+      drag.velocity = (event.clientX - drag.lastX) / Math.max(1, now - drag.lastTime);
+      drag.lastX = event.clientX;
+      drag.lastTime = now;
+      carouselOffset = Math.max(-1, Math.min(1, drag.offset + dx / carouselShift()));
+      positionCarousel();
+    });
     scheduleCarousel();
   }
-  document.addEventListener('pointerup', () => {carouselTouching = false; scheduleCarousel();});
-  document.addEventListener('pointercancel', () => {carouselTouching = false; scheduleCarousel();});
+  function endCarouselDrag(event) {
+    const drag = carouselDrag;
+    if (!drag || drag.id !== event.pointerId) return;
+    carouselDrag = null;
+    carouselTouching = false;
+    if (drag.viewport.hasPointerCapture(event.pointerId)) drag.viewport.releasePointerCapture(event.pointerId);
+    if (drag.horizontal) {
+      carouselClickUntil = performance.now() + 500;
+      if (document.activeElement?.closest?.('.artistCarousel')) document.activeElement.blur();
+      carouselFocused = false;
+      const velocity = performance.now() - drag.lastTime < 100 ? drag.velocity / carouselShift() : 0;
+      const projected = event.type === 'pointercancel' ? carouselOffset : carouselOffset + velocity * 150;
+      settleCarousel(Math.max(-1,Math.min(1,Math.round(projected))));
+    } else scheduleCarousel();
+  }
+  document.addEventListener('pointerup', endCarouselDrag);
+  document.addEventListener('pointercancel', endCarouselDrag);
   document.addEventListener('visibilitychange', scheduleCarousel);
   window.addEventListener('resize', () => {
     if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null; carouselOffset = 0;}
+    carouselDrag = null; carouselTouching = false;
     const track = document.getElementById('artistTrack');
     if (track) {track.innerHTML = carousel(); layoutCarousel();}
     scheduleCarousel();
