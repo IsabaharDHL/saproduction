@@ -45,7 +45,7 @@
   }
   const link = (key, href, action = key) => `<a href="${href}" data-open="${action}">${text(key)}</a>`;
   function nav() {
-    return `<nav><div class="w nav"><a href="index.html"><img class="logo" src="logo-white.png" alt="${text('brand')}"></a><div class="menu">${link('home','index.html','')}${link('events','events.html')}${link('studio','studio.html')}${link('artists','artists.html')}${link('offers','index.html#offers')}${link('about','index.html#about')}</div><div style="display:flex;gap:8px"><button class="langBtn" id="langBtn" aria-label="${text('languageLabel')}">${text('language')}</button><a class="btn" href="${page === 'index' ? '' : 'index.html'}#booking">${text('booking')}</a></div></div></nav>`;
+    return `<nav><div class="w nav"><a href="index.html"><img class="logo" src="logo-white.png" alt="${text('brand')}"></a><div class="menu" id="siteMenu">${link('home','index.html','')}${link('events','events.html')}${link('studio','studio.html')}${link('artists','artists.html')}${link('offers','index.html#offers')}${link('about','index.html#about')}</div><div style="display:flex;gap:8px"><button class="langBtn sa-menu-toggle" id="menuToggle" aria-controls="siteMenu" aria-expanded="false" aria-label="${lang==='ar'?'فتح القائمة':'Open menu'}">☰</button><button class="langBtn" id="langBtn" aria-label="${text('languageLabel')}">${text('language')}</button><a class="btn" href="${page === 'index' ? '' : 'index.html'}#booking">${text('booking')}</a></div></div></nav>`;
   }
   const footer = () => `<footer><img src="logo-white.png" alt="${text('brand')}"><p>${text('copyright')}</p><small>${text('credit')}</small></footer>`;
   const artistCard = i => `<a class="card artist" href="artist.html?i=${i+1}" data-open="artist" data-index="${i}"><div class="photo" style="${background(data.artists[i].image,'management.jpg')};background-position:${artistPosition(data.artists[i])}"></div><b>${esc(words.artistContent[i].name)}</b></a>`;
@@ -62,7 +62,7 @@
     const track = document.getElementById('artistTrack');
     return track?.children[0] ? track.children[0].getBoundingClientRect().width + 15 : 1;
   }
-  const carouselShift = () => (lang === 'ar' ? 1 : -1) * carouselStep();
+  const carouselShift = () => -carouselStep();
   function positionCarousel() {
     const track = document.getElementById('artistTrack');
     if (track) track.style.transform = 'translateX(' + (carouselOffset + (data.artists.length > 1 ? 1 : 0)) * carouselShift() + 'px)';
@@ -71,11 +71,13 @@
     const track = document.getElementById('artistTrack'), count = visibleArtists();
     if (!track) return;
     track.style.display = 'flex';
+    track.style.direction = 'ltr';
     track.style.gap = '15px';
     track.style.willChange = 'transform';
     for (const card of track.children) {
       card.style.flex = '0 0 calc((100% - ' + Math.max(0, count - 1) * 15 + 'px) / ' + Math.max(1, count) + ')';
       card.style.minWidth = '0';
+      card.style.direction = lang === 'ar' ? 'rtl' : 'ltr';
     }
     for (const id of ['prev', 'next']) document.getElementById(id).disabled = data.artists.length <= 1;
     positionCarousel();
@@ -128,13 +130,16 @@
   }
   function moveCarousel(direction) {
     stopCarousel();
-    if (carouselAnimation || carouselTouching || data.artists.length <= 1) return;
+    if (carouselAnimation || data.artists.length <= 1) return;
+    carouselDrag = null;
+    carouselTouching = false;
     settleCarousel(direction);
   }
   function initCarousel() {
     const root = document.querySelector('.artistCarousel'), track = document.getElementById('artistTrack');
     if (!root || !track) return;
     const viewport = track.parentElement;
+    viewport.style.direction = 'ltr';
     viewport.style.touchAction = 'pan-y';
     viewport.style.userSelect = 'none';
     viewport.style.webkitUserSelect = 'none';
@@ -152,12 +157,12 @@
       if (performance.now() < carouselClickUntil) {event.preventDefault(); event.stopPropagation();}
     }, true);
     viewport.addEventListener('pointerdown', event => {
-      if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0) || carouselAnimation || data.artists.length <= 1) return;
+      if (event.pointerType === 'touch' || event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0) || carouselAnimation || data.artists.length <= 1) return;
       carouselTouching = true;
       stopCarousel();
       carouselDrag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:carouselOffset, horizontal:false, lastX:event.clientX, lastTime:performance.now(), velocity:0, viewport};
     });
-    viewport.addEventListener('pointermove', event => {
+    const moveDrag = event => {
       const drag = carouselDrag;
       if (!drag || drag.id !== event.pointerId) return;
       const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
@@ -165,7 +170,7 @@
         if (Math.max(Math.abs(dx),Math.abs(dy)) < 8) return;
         if (Math.abs(dy) > Math.abs(dx)) {carouselDrag=null; carouselTouching=false; scheduleCarousel(); return;}
         drag.horizontal = true;
-        viewport.setPointerCapture(event.pointerId);
+        if (!drag.touch) viewport.setPointerCapture(event.pointerId);
       }
       event.preventDefault();
       const now = performance.now();
@@ -174,7 +179,30 @@
       drag.lastTime = now;
       carouselOffset = Math.max(-1, Math.min(1, drag.offset + dx / carouselShift()));
       positionCarousel();
-    });
+    };
+    viewport.addEventListener('pointermove', moveDrag);
+    // Safari touch listeners must be non-passive to retain horizontal gestures.
+    viewport.addEventListener('touchstart', event => {
+      if (event.touches.length !== 1 || carouselAnimation || data.artists.length <= 1) return;
+      const touch = event.touches[0];
+      carouselTouching = true;
+      stopCarousel();
+      carouselDrag = {id:touch.identifier, x:touch.clientX, y:touch.clientY, offset:carouselOffset, horizontal:false, lastX:touch.clientX, lastTime:performance.now(), velocity:0, viewport, touch:true};
+    }, {passive:true});
+    viewport.addEventListener('touchmove', event => {
+      const drag = carouselDrag;
+      if (!drag?.touch) return;
+      if (event.touches.length !== 1) {endCarouselDrag({pointerId:drag.id,type:'pointercancel'}); return;}
+      const touch = Array.from(event.touches).find(t => t.identifier === drag.id);
+      if (touch) moveDrag({pointerId:touch.identifier,clientX:touch.clientX,clientY:touch.clientY,preventDefault:()=>{if(event.cancelable)event.preventDefault();}});
+    }, {passive:false});
+    const endTouch = event => {
+      const drag = carouselDrag;
+      if (!drag?.touch) return;
+      if (Array.from(event.changedTouches).some(t => t.identifier === drag.id)) endCarouselDrag({pointerId:drag.id,type:event.type==='touchcancel'?'pointercancel':'pointerup'});
+    };
+    viewport.addEventListener('touchend', endTouch);
+    viewport.addEventListener('touchcancel', endTouch);
     scheduleCarousel();
   }
   function endCarouselDrag(event) {
@@ -182,7 +210,7 @@
     if (!drag || drag.id !== event.pointerId) return;
     carouselDrag = null;
     carouselTouching = false;
-    if (drag.viewport.hasPointerCapture(event.pointerId)) drag.viewport.releasePointerCapture(event.pointerId);
+    if (!drag.touch && drag.viewport.hasPointerCapture(event.pointerId)) drag.viewport.releasePointerCapture(event.pointerId);
     if (drag.horizontal) {
       carouselClickUntil = performance.now() + 500;
       if (document.activeElement?.closest?.('.artistCarousel')) document.activeElement.blur();
@@ -192,8 +220,8 @@
       settleCarousel(Math.max(-1,Math.min(1,Math.round(projected))));
     } else scheduleCarousel();
   }
-  document.addEventListener('pointerup', endCarouselDrag);
-  document.addEventListener('pointercancel', endCarouselDrag);
+  document.addEventListener('pointerup', event => {if(event.pointerType !== 'touch')endCarouselDrag(event);});
+  document.addEventListener('pointercancel', event => {if(event.pointerType !== 'touch')endCarouselDrag(event);});
   document.addEventListener('visibilitychange', scheduleCarousel);
   window.addEventListener('resize', () => {
     if (carouselAnimation) {carouselAnimation.cancel(); carouselAnimation = null; carouselOffset = 0;}
@@ -316,6 +344,20 @@
   document.addEventListener('click', event => {
     const target=event.target.closest('a,button,#mw');
     if (!target) return;
+    const menu=document.getElementById('siteMenu'), menuToggle=document.getElementById('menuToggle');
+    if(target.id==='menuToggle') {
+      const open=menu.classList.toggle('sa-mobile-open');
+      menuToggle.setAttribute('aria-expanded',String(open));
+      menuToggle.setAttribute('aria-label',lang==='ar'?(open?'إغلاق القائمة':'فتح القائمة'):(open?'Close menu':'Open menu'));
+      menuToggle.textContent=open?'×':'☰';
+      return;
+    }
+    if(menu?.contains(target)) {
+      menu.classList.remove('sa-mobile-open');
+      menuToggle.setAttribute('aria-expanded','false');
+      menuToggle.setAttribute('aria-label',lang==='ar'?'فتح القائمة':'Open menu');
+      menuToggle.textContent='☰';
+    }
     if (target.id==='langBtn') {
       lang=lang==='ar'?'en':'ar';
       try {localStorage.setItem('saLang',lang);} catch {}
@@ -362,6 +404,16 @@
 })();
 const loadingStyle=document.createElement('style');
   loadingStyle.textContent=`
+    .sa-menu-toggle{display:none}
+    @media(max-width:800px){
+      nav{position:relative;z-index:30}
+      .sa-menu-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;font-size:23px}
+      .menu.sa-mobile-open{display:flex;position:absolute;top:72px;inset-inline:3.5%;flex-direction:column;gap:0;background:#101010;border:1px solid #444;border-radius:14px;box-shadow:0 16px 30px #0008;padding:8px;z-index:31}
+      .menu.sa-mobile-open a{display:block;padding:14px 16px;border-radius:8px}
+      .menu.sa-mobile-open a:focus-visible{outline:2px solid #fff}
+      .menu.sa-mobile-open a:after{display:none}
+      .nav .btn{padding:9px 12px;font-size:13px}
+    }
     .sa-loading{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:60px 24px;background:radial-gradient(ellipse at center,#ffffff08,transparent 60%)}
     .sa-loading-brand{position:relative;width:150px;height:150px;overflow:hidden;animation:sa-breathe 2.4s ease-in-out infinite}
     .sa-loading-brand img{width:100%;height:100%;object-fit:contain;display:block}
