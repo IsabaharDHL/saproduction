@@ -190,15 +190,48 @@
     if (!x) return `<h1>${text('specialOffers')}</h1>`;
     return `<h1>${esc(content.name)}</h1>${x.image?`<div class="modalHero" style="${background(x.image,'management.jpg')}"></div>`:''}<p>${esc(content.description)}</p>${wa('inquireOffer',t('inquiryMessage',{name:content.name}))}`;
   }
+  function socialLinks() {
+    const icons={
+      Instagram:'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="18" cy="6" r="1" fill="currentColor" stroke="none"/>',
+      Youtube:'<rect x="2" y="5" width="20" height="14" rx="4"/><path d="m10 9 6 3-6 3Z" fill="currentColor" stroke="none"/>',
+      Snapchat:'<path d="M8 10V7a4 4 0 0 1 8 0v3l2-1 1 2-3 1c0 3 2 4 4 5l-3 1-1 2-4-1-4 1-1-2-3-1c2-1 4-2 4-5l-3-1 1-2Z"/>',
+      Whatsapp:'<path d="M5 19 3 22l5-1a9 9 0 1 0-3-2Z"/><path d="M8 7c-2 3 3 9 7 9l2-2-3-2-1 1c-2-1-3-2-3-3l1-1-2-3Z"/>'
+    };
+    const links=Object.entries(icons).map(([key,icon])=>{
+      let value=String(data["social"+key]||"").trim();
+      if(!value)return "";
+      try {const url=new URL(value);if(!["https:","http:"].includes(url.protocol))return "";value=url.href;}catch{return "";}
+      const labels={Instagram:"إنستقرام",Youtube:"يوتيوب",Snapchat:"سناب شات",Whatsapp:"واتساب"};
+      return `<a class="mini" href="${esc(value)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icon}</svg>${esc(lang==='ar'?labels[key]:key==='Youtube'?'YouTube':key==='Whatsapp'?'WhatsApp':key)}</a>`;
+    }).join("");
+    return links?`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:24px">${links}</div>`:"";
+  }
+  function serviceVideos(kind) {
+    const urls=Array.isArray(data[kind+"Videos"])?data[kind+"Videos"]:[];
+    const videos=urls.map((url,i)=>{
+      const id=yt(url);
+      return id?`<button class="thumb" data-service-play="${id}" data-service-kind="${kind}" style="background-image:url('https://img.youtube.com/vi/${id}/hqdefault.jpg')" aria-label="${text('video',{number:i+1})}"></button>`:"";
+    }).join("");
+    return videos?`<h2>${lang==='ar'?'أعمالنا':'Our Work'}</h2><div class="videoGrid">${videos}</div>`:"";
+  }
+  document.addEventListener("click",event=>{
+    const target=event.target.closest("button");
+    if(!target)return;
+    const kind=target.dataset.serviceKind;
+    if(kind!=="events"&&kind!=="studio")return;
+    if(target.dataset.servicePlay){modal={kind:"servicePlay",id:target.dataset.servicePlay,serviceKind:kind};renderModal();}
+    if(target.id==="backService"){modal=page===kind?null:{kind};renderModal();}
+  });
   function modalContent() {
     const {kind,index,id,returnIndex}=modal;
+    if(kind==='servicePlay') return `<button class="wa" id="backService" data-service-kind="${modal.serviceKind}">${lang==='ar'?'→ رجوع إلى ':'← Back to '}${text(modal.serviceKind)}</button><br><br><iframe class="player" title="${text('player')}" src="https://www.youtube.com/embed/${id}?autoplay=1&hl=${lang}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
     if (kind==='artist') return artistDetail(index);
     if (kind==='offer') return offerDetail(index);
     if (kind==='play') return `<button class="wa" id="backArtist" data-return-index="${returnIndex}">${lang==='ar'?'→':'←'} ${text('backToArtist')}</button><br><br><iframe class="player" title="${text('player')}" src="https://www.youtube.com/embed/${id}?autoplay=1&hl=${lang}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-    if (kind==='about') return `<h1>${text('about')}</h1><p>${text('aboutText')}</p>`;
+    if (kind==='about') return `<h1>${text('about')}</h1><p>${text('aboutText')}</p>${socialLinks()}`;
     if (kind==='artists') return `<h1>${text('artists')}</h1><div class="videoGrid">${data.artists.map((x,i)=>`<a class="mini" style="text-align:center" href="artist.html?i=${i+1}" data-open="artist" data-index="${i}"><img src="${esc(picture(x.image,'management.jpg'))}" alt="" width="96" height="96" style="display:block;width:96px;height:96px;max-width:100%;object-fit:cover;object-position:${focus(x.thumbFocusX??x.focusX??50)}% ${focus(x.thumbFocusY??x.focusY??25)}%;border-radius:8px;margin:0 auto 12px"><h3>${esc(words.artistContent[i].name)}</h3></a>`).join('')}</div>`;
     if (kind==='offers') return `<h1>${text('specialOffers')}</h1><div class="videoGrid">${data.offers.map((x,i)=>`<a class="mini" href="offer.html?id=${i+1}" data-open="offer" data-index="${i}"><h3>${esc(words.offerContent[i].name)}</h3><p>${esc(words.offerContent[i].description)}</p></a>`).join('')}</div>`;
-    return `<h1>${text(kind)}</h1><div class="modalHero" style="background-image:url('${kind}.jpg')"></div><div class="videoGrid">${serviceCards(kind,true)}</div>`;
+    return `<h1>${text(kind)}</h1><div class="modalHero" style="background-image:url('${kind}.jpg')"></div><div class="videoGrid">${serviceCards(kind,true)}</div>${serviceVideos(kind)}`;
   }
   function detailPage() {
     if (page==='artist' || page==='offer') {
@@ -206,7 +239,7 @@
       return `<section><div class="w"><div class="panel">${page==='artist'?artistDetail(index):offerDetail(index)}</div></div></section>`;
     }
     const isArtists=page==='artists', key=isArtists?'artists':page==='events'?'events':'studio';
-    return `<header class="pageHero" style="--bg:url(${isArtists?'management':key}.jpg)"><div><h1>${text(key)}</h1></div></header><section><div class="w"><div class="${isArtists?'g4':'g3'}">${isArtists?data.artists.map((_,i)=>artistCard(i)).join(''):serviceCards(key,false)}</div>${isArtists?'':`<br>${wa('inquire',t('inquiryMessage',{name:t(key)}))}`}</div></section>`;
+    return `<header class="pageHero" style="--bg:url(${isArtists?'management':key}.jpg)"><div><h1>${text(key)}</h1></div></header><section><div class="w"><div class="${isArtists?'g4':'g3'}">${isArtists?data.artists.map((_,i)=>artistCard(i)).join(''):serviceCards(key,false)}</div>${isArtists?'':`${serviceVideos(key)}<br>${wa('inquire',t('inquiryMessage',{name:t(key)}))}`}</div></section>`;
   }
   function renderModal() {
     const wrap=document.getElementById('mw');
